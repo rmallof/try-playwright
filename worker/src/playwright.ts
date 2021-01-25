@@ -12,6 +12,8 @@ import { Connection } from 'playwright/lib/client/connection';
 // @ts-ignore
 import { Page } from 'playwright/lib/client/page';
 // @ts-ignore
+import { Selectors } from 'playwright/lib/server/selectors';
+// @ts-ignore
 import { BrowserServerLauncherImpl } from 'playwright/lib/browserServerImpl';
 // @ts-ignore
 import { DispatcherConnection } from 'playwright/lib/dispatchers/dispatcher';
@@ -172,6 +174,7 @@ const setupInProcess = () => {
   clientConnection.onmessage = (message: any): any => setImmediate(() => dispatcherConnection.dispatch(message));
 
   (playwrightAPI as any)._toImpl = (x: any) => dispatcherConnection._dispatchers.get(x._guid)!._object;
+  playwrightAPI.selectors = new Selectors()
   return playwrightAPI;
 }
 /* eslint-enable @typescript-eslint/no-explicit-any,@typescript-eslint/no-non-null-assertion */

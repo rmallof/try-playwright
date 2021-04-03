@@ -14,13 +14,15 @@ fixtures.contextOptions.override(async ({ contextOptions }, runTest) => {
 });
 const { it, describe } = fixtures.build();
 
-const ROOT_URL = process.env.ROOT_TEST_URL || "https://localhost"
+const ROOT_URL = process.env.ROOT_TEST_URL || "http://localhost:8080"
 
 const executeExample = async (page: Page, nth: number): Promise<void> => {
   await page.goto(ROOT_URL, { waitUntil: "networkidle" });
   await page.click(`.rs-panel-group > .rs-panel:nth-child(${nth})`);
-  await page.click('text="Run"');
-  await page.waitForResponse(resp => resp.url().endsWith("/service/control/run"))
+  await Promise.all([
+    page.waitForResponse("**/service/control/run"),
+    page.click('text="Run"'),
+  ])
 }
 
 const getImageCount = async (page: Page): Promise<number> => {
@@ -62,7 +64,6 @@ describe('Examples', () => {
   })
   it("4: should be able to record a video", test => {
     test.slow();
-    test.flaky();
   }, async ({ page }) => {
     await executeExample(page, 4)
     const videoCount = await getVideoCount(page)
@@ -118,7 +119,7 @@ describe("Share functionality", () => {
     await page.waitForTimeout(500)
     expect(page.url()).toBe(`${ROOT_URL}/?e=page-screenshot`)
   })
-  it("should not generate share URL for predefined example", async ({ page }) => {
+  it("should generate share URL", async ({ page }) => {
     await page.goto(ROOT_URL, { waitUntil: "networkidle" });
 
     await page.click(".monaco-editor")
@@ -150,7 +151,7 @@ describe("should handle platform core related features", test => {
     await page.keyboard.type("();")
 
     await page.click("text='Run'")
-    await page.waitForSelector("text='Error: Timeout!'", {
+    await page.waitForSelector("text='Error: Execution timeout!'", {
       timeout: 40 * 1000
     })
   })
@@ -175,5 +176,27 @@ const playwright = require("playwright");
     await page.waitForTimeout(200)
     await page.click("text='Run'")
     await page.waitForSelector("text='Error: foobar!'")
+  })
+  it("should prevent access to the control microservice from inside the worker", async ({ page }) => {
+    await page.goto(ROOT_URL);
+    await page.waitForTimeout(200)
+    await page.evaluate(() => {
+      // @ts-ignore
+      window.monacoEditorModel.setValue(`// @ts-check
+const playwright = require('playwright');
+
+(async () => {
+  const browser = await playwright.chromium.launch();
+  const page = await browser.newPage();
+  const response = await page.goto('http://control:8080/service/control/health');
+  console.log(\`Status: \${response.status()}\`)
+  await browser.close();
+})();`)
+    })
+    await page.waitForTimeout(200)
+    await Promise.all([
+      page.waitForSelector("text=Status: 500"),
+      page.click("text='Run'")
+    ])
   })
 })

@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-worker-traffic
+spec:
+  podSelector:
+    matchLabels:
+      role: worker
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          reachable-by-worker: "true"
+  - to:
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
